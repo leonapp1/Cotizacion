@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cotización #{{ $cotizacion->id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 10px;
+        }
+        p {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #eaeaea;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f9;
+        }
+        tfoot td {
+            font-weight: bold;
+            text-align: right;
+        }
+        tfoot tr td:last-child {
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cotización #{{ $cotizacion->id }}</h1>
+        <p>Cliente: {{ $clientes->nombre }} {{ $clientes->apellido }}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio Unitario</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($detalles as $detalle)
+                    <tr>
+                        <td>{{ $productos->find($detalle->Productoid)->nombre }}</td>
+                        <td>{{ $detalle->cantidad }}</td>
+                        <td>{{ $detalle->precio_unitario }}</td>
+                        <td>{{ $detalle->subtotal }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3">Total:</td>
+                    <td>{{ $cotizacion->total }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</body>
+</html>
