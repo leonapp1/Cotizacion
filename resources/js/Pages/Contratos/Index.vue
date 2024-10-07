@@ -1,4 +1,3 @@
-
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -25,7 +24,8 @@ const showmodalview = ref(false);
 
 const form = useForm({
     clienteid: '',
-    total: '',
+    total: '', // Total antes del descuento
+    total_descuento: 0, // Nuevo campo para el total con descuento
     descuento: 0,
     requerimiento: '',
     ubicacion: '',
@@ -34,8 +34,8 @@ const form = useForm({
     distrito: '',
     detallecontratos: [],
     obscheck: [],
+    pagos: [],
 });
-
 const list = ref([{
     cantidad: '',
     precio_unitario: '',
@@ -43,9 +43,13 @@ const list = ref([{
     productoid: ''
 }]);
 
-const obscheck = ref([
-    // Tus observaciones aquí
-]);
+const paymentsList = ref([{ // Lista de pagos ficticios para mostrar inicialmente
+    no_pago: 1,
+    descripcion: '',
+    cantidad: 0
+}]);
+
+const obscheck = ref([]);
 
 const eliminarEntrada = (index) => {
     list.value.splice(index, 1);
@@ -60,6 +64,31 @@ const agregarEntrada = () => {
     });
 };
 
+// Agregar Pago
+const agregarPago = () => {
+    const no_pago = paymentsList.value.length + 1;
+    paymentsList.value.push({
+        no_pago,
+        descripcion: '', // Esto será seleccionado por el usuario
+        cantidad: 0
+    });
+};
+
+// Eliminar Pago
+const eliminarPago = (index) => {
+    paymentsList.value.splice(index, 1);
+};
+
+// Validar si los pagos son correctos
+const validarPagos = () => {
+    const pagosInvalidos = paymentsList.value.filter(pago => !pago.descripcion || isNaN(pago.cantidad) || pago.cantidad <= 0);
+    if (pagosInvalidos.length > 0) {
+        return false; // Al menos un pago es inválido
+    }
+    const totalPagos = paymentsList.value.reduce((sum, pago) => sum + (parseFloat(pago.cantidad) || 0), 0);
+    return totalPagos <= form.total; // Validar que los pagos no excedan el total
+};
+
 watch(
     () => list.value.map(entry => [entry.cantidad, entry.precio_unitario]),
     (newVal) => {
@@ -71,16 +100,27 @@ watch(
     { deep: true }
 );
 
+// Cálculo del total y saldo sobrante
 const totalSum = computed(() => {
     const totalSinDescuento = list.value.reduce((sum, entry) => sum + (parseFloat(entry.subtotal) || 0), 0);
     const descuentoValor = parseFloat(form.descuento) || 0;
     form.total = totalSinDescuento;
-    form.total_descuento = totalSinDescuento - descuentoValor;
-    return formatCurrency(form.total_descuento); // Devolver el total formateado
+    form.total_descuento = totalSinDescuento - descuentoValor; // Calcula y asigna el total con descuento
+    return formatCurrency(form.total_descuento);
 });
+
+const montoSobrante = computed(() => {
+    const totalPagos = paymentsList.value.reduce((sum, pago) => sum + (parseFloat(pago.cantidad) || 0), 0);
+    const sobrante = form.total_descuento - totalPagos; // Usar total con descuento
+    return sobrante >= 0 ? formatCurrency(sobrante) : "Error: pagos exceden el total";
+});
+
+
+
 
 const guardar_pdf = () => {
     form.detallecontratos = list.value;
+    form.pagos = paymentsList.value; // Guardamos los pagos en el formulario
 
     const options = {
         onSuccess: () => {
@@ -91,11 +131,12 @@ const guardar_pdf = () => {
     };
 
     if (operation.value == 1) {
-        form.post(route('contratos.store'), options);
+        form.post(route('contratos.store'), options); // Enviar también el campo total_descuento
     } else {
         form.put(route('contratos.update', form.id), options);
     }
 };
+
 
 const ok = (m) => {
     form.reset();
@@ -105,6 +146,11 @@ const ok = (m) => {
         subtotal: 0,
         productoid: ''
     }]);
+    paymentsList.value = ([{
+        no_pago: 1,
+        descripcion: '',
+        cantidad: 0
+    }]);
     msj.value = m;
     clasMsj.value = '';
     setTimeout(() => {
@@ -112,38 +158,13 @@ const ok = (m) => {
     }, 8000);
 };
 
-const validarEntrada = (entrada) => {
-    return entrada.cantidad && !isNaN(entrada.cantidad) && entrada.precio_unitario && !isNaN(entrada.precio_unitario) && entrada.productoid;
-};
-
 const guardar_pdf_validado = () => {
     const entradasInvalidas = list.value.filter(entrada => !validarEntrada(entrada));
 
-    if (entradasInvalidas.length === 0 && form.clienteid && form.requerimiento && form.ubicacion && form.departamento && form.provincia && form.distrito) {
+    if (entradasInvalidas.length === 0 && validarPagos() && form.clienteid && form.requerimiento && form.ubicacion && form.departamento && form.provincia && form.distrito) {
         guardar_pdf();
     } else {
-        msj.value = 'Por favor, asegúrese de que todas las entradas sean válidas.';
-        if (!form.clienteid) {
-            msj.value += ' Falta seleccionar un cliente.\n';
-        }
-        if (!form.requerimiento) {
-            msj.value += ' Falta ingresar el requerimiento.\n';
-        }
-        if (!form.ubicacion) {
-            msj.value += ' Falta ingresar la ubicación.\n';
-        }
-        if (!form.departamento) {
-            msj.value += ' Falta ingresar el departamento.\n';
-        }
-        if (!form.provincia) {
-            msj.value += ' Falta ingresar la provincia.\n';
-        }
-        if (!form.distrito) {
-            msj.value += ' Falta ingresar el distrito. \n';
-        }
-        if (!form.descuento) {
-            msj.value += ' Falta ingresar el Descuento. \n ';
-        }
+        msj.value = 'Por favor, asegúrese de que todas las entradas y pagos sean válidos.';
         clasMsj.value = '';
         setTimeout(() => {
             clasMsj.value = 'hidden';
@@ -151,33 +172,40 @@ const guardar_pdf_validado = () => {
     }
 };
 
+const validarEntrada = (entrada) => {
+    return entrada.cantidad && !isNaN(entrada.cantidad) && entrada.precio_unitario && !isNaN(entrada.precio_unitario) && entrada.productoid;
+};
 
 const actualizarPrecio = (productId, index) => {
     const producto = props.productos.find(p => p.id === productId);
     if (producto) {
-        list.value[index].precio_unitario = producto.precio; // Asumiendo que el precio está en la propiedad 'precio'
+        list.value[index].precio_unitario = producto.precio;
     } else {
-        list.value[index].precio_unitario = ''; // Reiniciar si no se encuentra
+        list.value[index].precio_unitario = '';
     }
 };
+
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('es-PE', {
         style: 'currency',
-        currency: 'PEN', // Cambia a la moneda que necesites
+        currency: 'PEN',
     }).format(value);
 };
-
-const OpenModalView = () => {
-    showmodalview.value = true
-    console.log(obscheck)
-
-};
-const CloseModalView = () => {
-    showmodalview.value = false
-};
+const productosSeleccionados = computed(() => {
+    return list.value
+        .filter(entrada => entrada.productoid)
+        .map(entrada => {
+            const producto = props.productos.find(p => p.id === entrada.productoid);
+            return {
+                id: producto.id,
+                nombre: producto.nombre
+            };
+        });
+});
 </script>
 
 <template>
+
     <Head title="Contratos" />
     <AuthenticatedLayout>
         <template #header>
@@ -201,7 +229,7 @@ const CloseModalView = () => {
         </div>
 
         <div class="min-w-full p-4 bg-white rounded-lg shadow-xs">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                     <label for="first_name" class="block mb-2 text-sm font-medium text-gray-900 "> Cliente</label>
                     <div class="relative mb-6">
@@ -277,9 +305,9 @@ const CloseModalView = () => {
 
             </div>
         </div>
-        <div class="min-w-full p-6 bg-white rounded-lg shadow-md overflow-x-auto">
+        <div class="min-w-full p-6 overflow-x-auto bg-white rounded-lg shadow-md">
             <button @click="agregarEntrada"
-                class="mb-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600 transition duration-200">
+                class="px-4 py-2 mb-4 font-semibold text-white transition duration-200 bg-blue-500 rounded hover:bg-blue-600">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
                     <path fill-rule="evenodd"
                         d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 9a.75.75 0 0 0-1.5 0v2.25H9a.75.75 0 0 0 0 1.5h2.25V15a.75.75 0 0 0 1.5 0v-2.25H15a.75.75 0 0 0 0-1.5h-2.25V9Z"
@@ -290,19 +318,20 @@ const CloseModalView = () => {
 
             <table class="min-w-full bg-white border border-gray-200">
                 <thead>
-                    <tr class="bg-gray-100 text-left">
-                        <th class="px-4 py-3 border-b font-semibold">Producto</th>
-                        <th class="px-4 py-3 border-b font-semibold">Cantidad</th>
-                        <th class="px-4 py-3 border-b font-semibold">Precio Unitario</th>
-                        <th class="px-4 py-3 border-b font-semibold">SubTotal</th>
-                        <th class="px-4 py-3 border-b font-semibold">Eliminar</th>
+                    <tr class="text-left bg-gray-100">
+                        <th class="px-4 py-3 font-semibold border-b">Producto</th>
+                        <th class="px-4 py-3 font-semibold border-b">Cantidad</th>
+                        <th class="px-4 py-3 font-semibold border-b">Precio Unitario</th>
+                        <th class="px-4 py-3 font-semibold border-b">SubTotal</th>
+                        <th class="px-4 py-3 font-semibold border-b">Eliminar</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(entrada, index) in list" :key="index" class="hover:bg-gray-50">
                         <td class="px-4 py-3 border-b">
-                            <v-select label="nombre" class="w-full" :options="productos" :reduce="producto => producto.id"
-                                placeholder="Selecciona Producto" v-model="entrada.productoid"
+                            <v-select label="nombre" class="w-full" :options="productos"
+                                :reduce="producto => producto.id" placeholder="Selecciona Producto"
+                                v-model="entrada.productoid"
                                 @update:modelValue="(value) => actualizarPrecio(value, index)">
                                 <template #option="props">
                                     <div class="p-2"><img :src="props.img" alt="" class="w-20 h-20"></div>
@@ -322,7 +351,7 @@ const CloseModalView = () => {
                                 type="number" v-model="entrada.precio_unitario" placeholder="Precio Unitario">
                         </td>
                         <td class="px-4 py-3 border-b">
-                            <input class="w-full p-2 border rounded bg-gray-100" type="text" :value="entrada.subtotal"
+                            <input class="w-full p-2 bg-gray-100 border rounded" type="text" :value="entrada.subtotal"
                                 placeholder="Subtotal" disabled>
                         </td>
                         <td class="px-4 py-3 border-b">
@@ -333,49 +362,106 @@ const CloseModalView = () => {
                     </tr>
                 </tbody>
             </table>
+            <!-- Sección de Pagos -->
+            <!-- Pagos Section -->
+            <div class="min-w-full p-6 mt-6 bg-white rounded-lg shadow-md">
+                <h2 class="mb-4 text-xl font-semibold text-gray-800">Pagos</h2>
 
-            <div class="flex flex-col md:flex-row md:justify-between items-center mt-4">
-                <div class="flex items-center mb-4 md:mb-0">
-                    <span class="font-bold mr-2">Total:</span>
-                    <span class="text-lg font-semibold">{{ totalSum }}</span>
-                </div>
-                <div class="flex items-center">
-                    <InputIcons text="Descuento" required="required" v-model="form.descuento">
-                        S/.
-                    </InputIcons>
-                    <InputError class="m-1" :message="form.errors.descuento"></InputError>
+                <!-- Tabla de Pagos -->
+                <table class="min-w-full bg-white border border-gray-200">
+                    <thead>
+                        <tr class="text-left bg-gray-100">
+                            <th class="px-4 py-3 font-semibold border-b">N° Pago</th>
+                            <th class="px-4 py-3 font-semibold border-b">Descripción</th>
+                            <th class="px-4 py-3 font-semibold border-b">Cantidad</th>
+                            <th class="px-4 py-3 font-semibold border-b">Eliminar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(pago, index) in paymentsList" :key="index" class="hover:bg-gray-50">
+                            <td class="px-4 py-3 border-b">{{ pago.no_pago }}</td>
+                            <td class="px-4 py-3 border-b">
+                                <select v-model="pago.descripcion"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option disabled value="">Selecciona un producto</option>
+                                    <option v-for="producto in productosSeleccionados" :key="producto.id"
+                                        :value="producto.nombre">
+                                        {{ producto.nombre }}
+                                    </option>
+                                </select>
+                            </td>
+                            <td class="px-4 py-3 border-b">
+                                <input
+                                    class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    type="number" v-model="pago.cantidad" placeholder="Cantidad">
+                            </td>
+                            <td class="px-4 py-3 border-b">
+                                <button @click="eliminarPago(index)" class="text-red-600 hover:text-red-800">
+                                    Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="mt-4">
+                    <button @click="agregarPago"
+                        class="px-4 py-2 font-bold text-white bg-green-500 rounded hover:bg-green-700">
+                        Agregar Pago
+                    </button>
                 </div>
 
-                <SecondaryButton @click="OpenModalView()">
-                    Agregar Condiciones Generales
-                </SecondaryButton>
+                <!-- Monto sobrante -->
+                <div class="mt-4">
+                    <p class="text-lg font-semibold">Monto sobrante: <span class="text-blue-600">{{ montoSobrante
+                            }}</span></p>
+                    <p v-if="montoSobrante === 'Error: pagos exceden el total'" class="text-red-600">Error: La suma de
+                        los pagos
+                        excede el total del contrato.</p>
+                </div>
+                <div class="flex flex-col items-center mt-4 md:flex-row md:justify-between">
+                    <div class="flex items-center mb-4 md:mb-0">
+                        <span class="mr-2 font-bold">Total:</span>
+                        <span class="text-lg font-semibold">{{ totalSum }}</span>
+                    </div>
+                    <div class="flex items-center">
+                        <InputIcons text="Descuento" required="required" v-model="form.descuento">
+                            S/.
+                        </InputIcons>
+                        <InputError class="m-1" :message="form.errors.descuento"></InputError>
+                    </div>
+
+                    <SecondaryButton @click="OpenModalView()">
+                        Agregar Condiciones Generales
+                    </SecondaryButton>
+                </div>
+
+                <button @click="guardar_pdf_validado"
+                    class="px-4 py-2 mt-4 font-semibold text-white transition duration-200 bg-green-500 rounded hover:bg-green-600">
+                    Guardar y generar PDF
+                </button>
+
             </div>
-
-            <button @click="guardar_pdf_validado"
-                class="mt-4 bg-green-500 text-white font-semibold py-2 px-4 rounded hover:bg-green-600 transition duration-200">
-                Guardar y generar PDF
-            </button>
-
+            <Modal :show="showmodalview" @close="CloseModalView">
+                <div class="p-6">
+                    <div v-for="obs in observaciones" :key="obs.id"
+                        class="flex items-center border border-gray-200 rounded ps-4 dark:border-gray-700">
+                        <input :id="'checkbox-' + obs.id" type="checkbox" :value="obs.id" name="bordered-checkbox"
+                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                            v-model="form.obscheck" />
+                        <label :for="'checkbox-' + obs.id"
+                            class="w-full py-4 text-sm font-medium text-gray-900 ms-2 dark:text-gray-300">
+                            {{ obs.nombre }}
+                        </label>
+                    </div>
+                </div>
+                <div class="mt-6 ">
+                    <SecondaryButton @click="CloseModalView">
+                        cancel
+                    </SecondaryButton>
+                </div>
+            </Modal>
         </div>
-        <Modal :show="showmodalview" @close="CloseModalView">
-            <div class="p-6">
-                <div v-for="obs in observaciones" :key="obs.id"
-                    class="flex items-center ps-4 border border-gray-200 rounded dark:border-gray-700">
-                    <input :id="'checkbox-' + obs.id" type="checkbox" :value="obs.id" name="bordered-checkbox"
-                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                        v-model="form.obscheck" />
-                    <label :for="'checkbox-' + obs.id"
-                        class="w-full py-4 ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                        {{ obs.nombre }}
-                    </label>
-                </div>
-            </div>
-            <div class="mt-6 ">
-                <SecondaryButton @click="CloseModalView">
-                    cancel
-                </SecondaryButton>
-            </div>
-        </Modal>
     </AuthenticatedLayout>
 </template>
 
