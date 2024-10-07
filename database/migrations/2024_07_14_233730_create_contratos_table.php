@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('contratos', function (Blueprint $table) {
             $table->id();
-            $table->decimal("total", 10, 2);
+            $table->decimal('total', 10, 2);
             $table->string('requerimiento', 200);
             $table->string('ubicacion', 200);
             $table->string('departamento', 200);
             $table->string('provincia', 200);
             $table->string('distrito', 200);
             $table->string('descuento', 200);
-            $table->foreignId('clienteid')->constrained('clientes')->onUpdate("cascade")->onDelete('restrict');
+            $table->foreignId('clienteid')->constrained('clientes')->onUpdate('cascade')->onDelete('restrict');
             $table->timestamps();
         });
     }
