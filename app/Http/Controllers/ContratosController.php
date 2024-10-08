@@ -87,6 +87,7 @@ class ContratosController extends Controller
         $contratos->clienteid = $request->clienteid;
 
         $contratos->save();
+
         $idIngresado = $contratos->id;
 
         // Guardar los detalles del contrato
@@ -118,7 +119,7 @@ class ContratosController extends Controller
         }
 
         return inertia::render(
-            'Contratos/Show',
+            'Contratos/Index',
             [
                 'contratos' => Contratos::all(),
                 'productos' => Productos::all(),
@@ -135,10 +136,10 @@ class ContratosController extends Controller
     public function show(Contratos $contratos, $id)
     {
         //
-        $cotrato = Contratos::findOrFail($id);
+        $contrato = Contratos::findOrFail($id);
 
         return Inertia::render('Contratos/Index', [
-            'cotizacion' => $cotrato,
+            'cotizacion' => $contrato,
         ]);
     }
 

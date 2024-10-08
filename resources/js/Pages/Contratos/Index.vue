@@ -22,6 +22,15 @@ const clasMsj = ref('hidden');
 
 const showmodalview = ref(false);
 
+const OpenModalView = () => {
+    showmodalview.value = true
+    console.log(obscheck)
+};
+
+const CloseModalView = () => {
+    showmodalview.value = false
+};
+
 const form = useForm({
     clienteid: '',
     total: '', // Total antes del descuento
@@ -36,6 +45,7 @@ const form = useForm({
     obscheck: [],
     pagos: [],
 });
+
 const list = ref([{
     cantidad: '',
     precio_unitario: '',
@@ -114,9 +124,6 @@ const montoSobrante = computed(() => {
     const sobrante = form.total_descuento - totalPagos; // Usar total con descuento
     return sobrante >= 0 ? formatCurrency(sobrante) : "Error: pagos exceden el total";
 });
-
-
-
 
 const guardar_pdf = () => {
     form.detallecontratos = list.value;
