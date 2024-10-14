@@ -115,19 +115,19 @@ const totalSum = computed(() => {
     const totalSinDescuento = list.value.reduce((sum, entry) => sum + (parseFloat(entry.subtotal) || 0), 0);
     const descuentoValor = parseFloat(form.descuento) || 0;
     form.total = totalSinDescuento;
-    form.total_descuento = totalSinDescuento - descuentoValor; // Calcula y asigna el total con descuento
+    form.total_descuento = totalSinDescuento - descuentoValor;
     return formatCurrency(form.total_descuento);
 });
 
 const montoSobrante = computed(() => {
     const totalPagos = paymentsList.value.reduce((sum, pago) => sum + (parseFloat(pago.cantidad) || 0), 0);
-    const sobrante = form.total_descuento - totalPagos; // Usar total con descuento
+    const sobrante = form.total_descuento - totalPagos;
     return sobrante >= 0 ? formatCurrency(sobrante) : "Error: pagos exceden el total";
 });
 
 const guardar_pdf = () => {
     form.detallecontratos = list.value;
-    form.pagos = paymentsList.value; // Guardamos los pagos en el formulario
+    form.pagos = paymentsList.value;
 
     const options = {
         onSuccess: () => {
@@ -198,17 +198,7 @@ const formatCurrency = (value) => {
         currency: 'PEN',
     }).format(value);
 };
-const productosSeleccionados = computed(() => {
-    return list.value
-        .filter(entrada => entrada.productoid)
-        .map(entrada => {
-            const producto = props.productos.find(p => p.id === entrada.productoid);
-            return {
-                id: producto.id,
-                nombre: producto.nombre
-            };
-        });
-});
+
 </script>
 
 <template>
@@ -370,7 +360,6 @@ const productosSeleccionados = computed(() => {
                 </tbody>
             </table>
             <!-- Sección de Pagos -->
-            <!-- Pagos Section -->
             <div class="min-w-full p-6 mt-6 bg-white rounded-lg shadow-md">
                 <h2 class="mb-4 text-xl font-semibold text-gray-800">Pagos</h2>
 
@@ -390,11 +379,10 @@ const productosSeleccionados = computed(() => {
                             <td class="px-4 py-3 border-b">
                                 <select v-model="pago.descripcion"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option disabled value="">Selecciona un producto</option>
-                                    <option v-for="producto in productosSeleccionados" :key="producto.id"
-                                        :value="producto.nombre">
-                                        {{ producto.nombre }}
-                                    </option>
+                                    <option disabled value="">Selecciona un pago</option>
+                                    <option value="Primer adelanto">Primer adelanto</option>
+                                    <option value="Segundo adelanto">Segundo adelanto</option>
+                                    <option value="Restante a la entrega">Restante a la entrega</option>
                                 </select>
                             </td>
                             <td class="px-4 py-3 border-b">
@@ -449,6 +437,7 @@ const productosSeleccionados = computed(() => {
                 </button>
 
             </div>
+
             <Modal :show="showmodalview" @close="CloseModalView">
                 <div class="p-6">
                     <div v-for="obs in observaciones" :key="obs.id"
